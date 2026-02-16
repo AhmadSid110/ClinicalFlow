@@ -156,13 +156,15 @@ class DeepgramClient(private val apiKey: String) {
             .coerceAtMost(MAX_RECONNECT_DELAY_MS)
     }
     
-    fun sendAudio(audioData: ByteArray) {
+    fun sendAudio(audioData: ByteArray): Boolean {
         if (isConnected) {
             val success = webSocket?.send(ByteString.of(*audioData)) ?: false
             if (!success) {
                 Log.w(TAG, "Failed to send audio data")
             }
+            return success
         }
+        return false
     }
     
     fun close() {

@@ -114,7 +114,7 @@ def build_apk_remote(archive_bytes: bytes) -> str:
         
         # Build debug APK using installed Gradle (skip wrapper)
         print("[build] Running Gradle assembleDebug...")
-        run(["gradle", ":app:assembleDebug", "--no-daemon", "--stacktrace"], project_root)
+        run(["gradle", ":app:assembleDebug", "--no-daemon", "--stacktrace", "--info"], project_root)
         
         # Find the generated APK
         apk_paths = list(project_root.glob("**/build/outputs/apk/**/*.apk"))

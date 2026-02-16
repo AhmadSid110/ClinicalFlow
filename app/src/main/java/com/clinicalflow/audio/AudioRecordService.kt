@@ -271,7 +271,7 @@ class AudioRecordService : Service() {
         }
     }
     
-    private fun intToByteArrayLE(value: Int): Byte {
+    private fun intToByteArrayLE(value: Int): ByteArray {
         return ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(value).array()
     }
 }
