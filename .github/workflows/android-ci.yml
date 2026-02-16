@@ -1,112 +1,113 @@
 name: Android CI (Performance)
 
 on:
-workflow_dispatch:
-push:
-branches: [ main ]
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 permissions:
-contents: write
+  contents: write
 
 jobs:
-build:
-runs-on: ubuntu-latest
-timeout-minutes: 30
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-env:
-  ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
-  GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
 
-steps:
-  # 1️⃣ CHECKOUT
-  - name: Checkout
-    uses: actions/checkout@v4
-    with:
-      fetch-depth: 0
+    steps:
+      # 1️⃣ CHECKOUT
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  - run: chmod +x gradlew
+      - name: Make gradlew executable
+        run: chmod +x gradlew
 
-  # 2️⃣ JAVA 17
-  - name: Setup JDK
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: 17
+      # 2️⃣ JAVA 17
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
-  # 3️⃣ CACHE ANDROID SDK
-  - name: Cache Android SDK
-    uses: actions/cache@v4
-    with:
-      path: android-sdk
-      key: android-sdk-34
+      # 3️⃣ CACHE ANDROID SDK
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: android-sdk
+          key: android-sdk-34
 
-  # 4️⃣ CACHE GRADLE
-  - name: Cache Gradle
-    uses: actions/cache@v4
-    with:
-      path: .gradle
-      key: gradle-${{ runner.os }}-${{ hashFiles('*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
-      restore-keys: |
-        gradle-${{ runner.os }}-
+      # 4️⃣ CACHE GRADLE
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: .gradle
+          key: gradle-${{ runner.os }}-${{ hashFiles('*.gradle*', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
-  # 5️⃣ ANDROID SDK INSTALL (CACHE-AWARE)
-  - name: Install Android SDK
-    run: |
-      if [ ! -d "$ANDROID_SDK_ROOT/platforms/android-34" ]; then
-        mkdir -p "$ANDROID_SDK_ROOT"
-        cd "$ANDROID_SDK_ROOT"
-        curl -s https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
-        unzip -q tools.zip
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-        yes | cmdline-tools/latest/bin/sdkmanager \
-          --sdk_root="$ANDROID_SDK_ROOT" \
-          "platform-tools" \
-          "platforms;android-34" \
-          "build-tools;34.0.0"
-      fi
+      # 5️⃣ ANDROID SDK INSTALL (CACHE-AWARE)
+      - name: Install Android SDK
+        run: |
+          if [ ! -d "$ANDROID_SDK_ROOT/platforms/android-34" ]; then
+            mkdir -p "$ANDROID_SDK_ROOT"
+            cd "$ANDROID_SDK_ROOT"
+            curl -s https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o tools.zip
+            unzip -q tools.zip
+            mkdir -p cmdline-tools/latest
+            mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+            yes | cmdline-tools/latest/bin/sdkmanager \
+              --sdk_root="$ANDROID_SDK_ROOT" \
+              "platform-tools" \
+              "platforms;android-34" \
+              "build-tools;34.0.0"
+          fi
 
-  # 6️⃣ PROJECT CONFIG
-  - name: local.properties
-    run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+      # 6️⃣ PROJECT CONFIG
+      - name: local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
 
-  - name: gradle.properties (CI tuned)
-    run: |
-      cat <<EOF > gradle.properties
-      android.useAndroidX=true
-      android.enableJetifier=true
-      android.nonTransitiveRClass=true
-      org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m -XX:+UseG1GC
-      org.gradle.daemon=false
-      org.gradle.parallel=true
-      org.gradle.workers.max=2
-      org.gradle.caching=true
-      kotlin.incremental=true
-      kotlin.compiler.execution.strategy=in-process
-      EOF
+      - name: gradle.properties (CI tuned)
+        run: |
+          cat <<EOF > gradle.properties
+          android.useAndroidX=true
+          android.enableJetifier=true
+          android.nonTransitiveRClass=true
+          org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m -XX:+UseG1GC
+          org.gradle.daemon=false
+          org.gradle.parallel=true
+          org.gradle.workers.max=2
+          org.gradle.caching=true
+          kotlin.incremental=true
+          kotlin.compiler.execution.strategy=in-process
+          EOF
 
-  # 7️⃣ VERSION
-  - name: Version
-    run: echo "APP_VERSION=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+      # 7️⃣ VERSION
+      - name: Version
+        run: echo "APP_VERSION=dev-${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
 
-  # 8️⃣ BUILD
-  - name: Assemble Debug
-    run: |
-      ./gradlew :app:assembleDebug \
-        -PversionName=$APP_VERSION \
-        --no-daemon \
-        --fail-fast \
-        --warning-mode=none
+      # 8️⃣ BUILD
+      - name: Assemble Debug
+        run: |
+          ./gradlew :app:assembleDebug \
+            -PversionName=$APP_VERSION \
+            --no-daemon \
+            --fail-fast \
+            --warning-mode=none
 
-  # 9️⃣ ARTIFACT
-  - name: Rename APK
-    run: |
-      mv app/build/outputs/apk/debug/app-debug.apk \
-        app/build/outputs/apk/debug/app-${APP_VERSION}.apk
+      # 9️⃣ ARTIFACT
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/debug/app-debug.apk \
+            app/build/outputs/apk/debug/app-${APP_VERSION}.apk
 
-  - name: Upload APK
-    uses: softprops/action-gh-release@v2
-    with:
-      tag_name: ${{ env.APP_VERSION }}
-      prerelease: true
-      files: app/build/outputs/apk/debug/app-${{ env.APP_VERSION }}.apk
+      - name: Upload APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.APP_VERSION }}
+          prerelease: true
+          files: app/build/outputs/apk/debug/app-${{ env.APP_VERSION }}.apk
