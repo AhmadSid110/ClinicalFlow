@@ -71,11 +71,6 @@ Automatically scrubs before Gemini:
 - Emails
 - Addresses
 
-## Cost
-
-- Deepgram: ~200 hrs/month free
-- Gemini Flash: 15 RPM free tier
-
 ## Build
 
 ```bash
