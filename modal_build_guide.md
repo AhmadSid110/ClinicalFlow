@@ -83,14 +83,7 @@ Or delete the Modal volume:
 modal volume delete clinicalflow-gradle-cache
 ```
 
-## CI Comparison
 
-| Feature | Modal | GitHub Actions |
-|---------|-------|----------------|
-| Caching | Volume-mounted .gradle | GitHub Actions cache |
-| Warm build | ~3-5 min | ~5-8 min |
-| Cold build | ~8-12 min | ~10-15 min |
-| Cost | ~$0.50/run | ~$0.40/run |
 
 ## First-time Setup
 
