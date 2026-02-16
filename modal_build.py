@@ -19,6 +19,9 @@ import modal
 # Create or get the volume for APK storage
 volume = modal.Volume.from_name("clinicalflow-apk", create_if_missing=True)
 
+# Create or get volume for Gradle cache (speeds up subsequent builds)
+gradle_cache_volume = modal.Volume.from_name("clinicalflow-gradle-cache", create_if_missing=True)
+
 def run(cmd: List[str], cwd: pathlib.Path) -> None:
     print(f"[build] {' '.join(cmd)}")
     process = subprocess.Popen(
@@ -80,7 +83,7 @@ android_image = (
 app = modal.App("clinicalflow-builder")
 
 
-@app.function(image=android_image, volumes={"/vol": volume}, cpu=4.0, memory=32768, timeout=600)
+@app.function(image=android_image, volumes={"/vol": volume, "/root/.gradle": gradle_cache_volume}, cpu=4.0, memory=32768, timeout=600)
 def build_apk_remote(archive_bytes: bytes) -> str:
     """Build APK from uploaded project archive."""
     workdir = pathlib.Path(tempfile.mkdtemp(prefix="clinicalflow-modal-"))
@@ -111,6 +114,24 @@ def build_apk_remote(archive_bytes: bytes) -> str:
         # Create local.properties with SDK path
         local_props = project_root / "local.properties"
         local_props.write_text("sdk.dir=/sdk\n")
+        
+        # Create gradle.properties with optimizations
+        gradle_props = project_root / "gradle.properties"
+        gradle_props.write_text("""android.useAndroidX=true
+android.enableJetifier=true
+android.nonTransitiveRClass=true
+org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m -XX:+UseG1GC
+org.gradle.daemon=false
+org.gradle.parallel=true
+org.gradle.workers.max=2
+org.gradle.caching=true
+kotlin.incremental=true
+kotlin.compiler.execution.strategy=in-process
+""")
+        
+        # Pre-download dependencies (uses cached .gradle from volume)
+        print("[build] Pre-downloading dependencies...")
+        run(["gradle", "dependencies", "--no-daemon", "-q"], project_root)
         
         # Build debug APK using installed Gradle (skip wrapper)
         print("[build] Running Gradle assembleDebug...")
